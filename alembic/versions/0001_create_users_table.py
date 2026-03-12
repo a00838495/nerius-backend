@@ -1,0 +1,263 @@
+"""create learning platform schema
+
+Revision ID: 0001_create_users_table
+Revises:
+Create Date: 2026-03-09 00:00:00
+
+"""
+
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+revision: str = "0001_create_users_table"
+down_revision: Union[str, Sequence[str], None] = None
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.create_table(
+        "areas",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("name", sa.String(length=120), nullable=False),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name"),
+    )
+
+    op.create_table(
+        "users",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("area_id", sa.CHAR(length=36), nullable=True),
+        sa.Column("first_name", sa.String(length=100), nullable=False),
+        sa.Column("last_name", sa.String(length=100), nullable=False),
+        sa.Column("email", sa.String(length=255), nullable=False),
+        sa.Column("gender", sa.String(length=30), nullable=True),
+        sa.Column("status", sa.Enum("active", "inactive", "suspended", name="user_status_enum"), nullable=False, server_default=sa.text("'active'")),
+        sa.Column("last_login_at", sa.TIMESTAMP(), nullable=True),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.ForeignKeyConstraint(["area_id"], ["areas.id"], name="fk_users_area", ondelete="SET NULL", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "roles",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("name", sa.Enum("super_admin", "content_admin", "learner", name="role_name_enum"), nullable=False),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name"),
+    )
+
+    op.create_table(
+        "user_roles",
+        sa.Column("user_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("role_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("assigned_by_user_id", sa.CHAR(length=36), nullable=True),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.ForeignKeyConstraint(["assigned_by_user_id"], ["users.id"], name="fk_user_roles_assigned_by", ondelete="SET NULL", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["role_id"], ["roles.id"], name="fk_user_roles_role", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name="fk_user_roles_user", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("user_id", "role_id"),
+    )
+
+    op.create_table(
+        "courses",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("area_id", sa.CHAR(length=36), nullable=True),
+        sa.Column("title", sa.String(length=180), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("status", sa.Enum("draft", "published", "archived", name="course_status_enum"), nullable=False, server_default=sa.text("'draft'")),
+        sa.Column("estimated_minutes", sa.Integer(), nullable=True),
+        sa.Column("cover_url", sa.Text(), nullable=True),
+        sa.Column("created_by_user_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column("updated_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"), nullable=False),
+        sa.ForeignKeyConstraint(["area_id"], ["areas.id"], name="fk_courses_area", ondelete="SET NULL", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], name="fk_courses_created_by", ondelete="RESTRICT", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "course_modules",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("course_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("title", sa.String(length=180), nullable=False),
+        sa.Column("sort_order", sa.Integer(), nullable=False),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.ForeignKeyConstraint(["course_id"], ["courses.id"], name="fk_course_modules_course", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("course_id", "sort_order", name="uq_course_modules_course_sort"),
+    )
+
+    op.create_table(
+        "lessons",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("module_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("title", sa.String(length=180), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("sort_order", sa.Integer(), nullable=False),
+        sa.Column("estimated_minutes", sa.Integer(), nullable=True),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.ForeignKeyConstraint(["module_id"], ["course_modules.id"], name="fk_lessons_module", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("module_id", "sort_order", name="uq_lessons_module_sort"),
+    )
+
+    op.create_table(
+        "lesson_resources",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("lesson_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("resource_type", sa.Enum("video", "pdf", "podcast", "slide", name="lesson_resource_type_enum"), nullable=False),
+        sa.Column("title", sa.String(length=180), nullable=False),
+        sa.Column("external_url", sa.Text(), nullable=False),
+        sa.Column("thumbnail_url", sa.Text(), nullable=True),
+        sa.Column("duration_seconds", sa.Integer(), nullable=True),
+        sa.Column("metadata", sa.JSON(), nullable=True),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.ForeignKeyConstraint(["lesson_id"], ["lessons.id"], name="fk_lesson_resources_lesson", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "enrollments",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("user_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("course_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("status", sa.Enum("active", "completed", "dropped", name="enrollment_status_enum"), nullable=False, server_default=sa.text("'active'")),
+        sa.Column("progress_percent", sa.DECIMAL(precision=5, scale=2), nullable=False, server_default=sa.text("0")),
+        sa.Column("score", sa.DECIMAL(precision=10, scale=2), nullable=True),
+        sa.Column("started_at", sa.TIMESTAMP(), nullable=True),
+        sa.Column("completed_at", sa.TIMESTAMP(), nullable=True),
+        sa.Column("last_activity_at", sa.TIMESTAMP(), nullable=True),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.ForeignKeyConstraint(["course_id"], ["courses.id"], name="fk_enrollments_course", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name="fk_enrollments_user", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("user_id", "course_id", name="uq_enrollments_user_course"),
+    )
+
+    op.create_table(
+        "lesson_progress",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("enrollment_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("lesson_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("status", sa.Enum("not_started", "in_progress", "completed", name="lesson_progress_status_enum"), nullable=False, server_default=sa.text("'not_started'")),
+        sa.Column("progress_percent", sa.DECIMAL(precision=5, scale=2), nullable=False, server_default=sa.text("0")),
+        sa.Column("time_spent_seconds", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column("completed_at", sa.TIMESTAMP(), nullable=True),
+        sa.Column("last_activity_at", sa.TIMESTAMP(), nullable=True),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.ForeignKeyConstraint(["enrollment_id"], ["enrollments.id"], name="fk_lesson_progress_enrollment", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["lesson_id"], ["lessons.id"], name="fk_lesson_progress_lesson", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("enrollment_id", "lesson_id", name="uq_lesson_progress_enrollment_lesson"),
+    )
+
+    op.create_table(
+        "badges",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("name", sa.String(length=120), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("icon_url", sa.Text(), nullable=True),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "user_badges",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("user_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("badge_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("awarded_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.ForeignKeyConstraint(["badge_id"], ["badges.id"], name="fk_user_badges_badge", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name="fk_user_badges_user", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("user_id", "badge_id", name="uq_user_badges_user_badge"),
+    )
+
+    op.create_table(
+        "forum_posts",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("area_id", sa.CHAR(length=36), nullable=True),
+        sa.Column("author_user_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("title", sa.String(length=180), nullable=False),
+        sa.Column("content", sa.Text(), nullable=False),
+        sa.Column("status", sa.Enum("draft", "published", "archived", name="forum_post_status_enum"), nullable=False, server_default=sa.text("'draft'")),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column("updated_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column("published_at", sa.TIMESTAMP(), nullable=True),
+        sa.ForeignKeyConstraint(["area_id"], ["areas.id"], name="fk_forum_posts_area", ondelete="SET NULL", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["author_user_id"], ["users.id"], name="fk_forum_posts_author", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index("idx_forum_posts_area_status", "forum_posts", ["area_id", "status"], unique=False)
+    op.create_index("idx_forum_posts_author", "forum_posts", ["author_user_id"], unique=False)
+
+    op.create_table(
+        "forum_comments",
+        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("post_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("author_user_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("parent_comment_id", sa.CHAR(length=36), nullable=True),
+        sa.Column("content", sa.Text(), nullable=False),
+        sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column("updated_at", sa.TIMESTAMP(), server_default=sa.text("NULL"), nullable=True),
+        sa.ForeignKeyConstraint(["author_user_id"], ["users.id"], name="fk_forum_comments_author", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["parent_comment_id"], ["forum_comments.id"], name="fk_forum_comments_parent", ondelete="SET NULL", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["post_id"], ["forum_posts.id"], name="fk_forum_comments_post", ondelete="CASCADE", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "analytics_events",
+        sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column("user_id", sa.CHAR(length=36), nullable=True),
+        sa.Column("area_id", sa.CHAR(length=36), nullable=True),
+        sa.Column("course_id", sa.CHAR(length=36), nullable=True),
+        sa.Column("lesson_id", sa.CHAR(length=36), nullable=True),
+        sa.Column("event_name", sa.String(length=100), nullable=False),
+        sa.Column("event_time", sa.TIMESTAMP(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column("metadata", sa.JSON(), nullable=True),
+        sa.ForeignKeyConstraint(["area_id"], ["areas.id"], name="fk_analytics_events_area", ondelete="SET NULL", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["course_id"], ["courses.id"], name="fk_analytics_events_course", ondelete="SET NULL", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["lesson_id"], ["lessons.id"], name="fk_analytics_events_lesson", ondelete="SET NULL", onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name="fk_analytics_events_user", ondelete="SET NULL", onupdate="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index("idx_analytics_events_area", "analytics_events", ["area_id"], unique=False)
+    op.create_index("idx_analytics_events_course", "analytics_events", ["course_id"], unique=False)
+    op.create_index("idx_analytics_events_lesson", "analytics_events", ["lesson_id"], unique=False)
+    op.create_index("idx_analytics_events_name_time", "analytics_events", ["event_name", "event_time"], unique=False)
+    op.create_index("idx_analytics_events_user", "analytics_events", ["user_id"], unique=False)
+
+    op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
+
+
+def downgrade() -> None:
+    op.drop_index("idx_analytics_events_user", table_name="analytics_events")
+    op.drop_index("idx_analytics_events_name_time", table_name="analytics_events")
+    op.drop_index("idx_analytics_events_lesson", table_name="analytics_events")
+    op.drop_index("idx_analytics_events_course", table_name="analytics_events")
+    op.drop_index("idx_analytics_events_area", table_name="analytics_events")
+    op.drop_table("analytics_events")
+    op.drop_table("forum_comments")
+    op.drop_index("idx_forum_posts_author", table_name="forum_posts")
+    op.drop_index("idx_forum_posts_area_status", table_name="forum_posts")
+    op.drop_table("forum_posts")
+    op.drop_table("user_badges")
+    op.drop_table("badges")
+    op.drop_table("lesson_progress")
+    op.drop_table("enrollments")
+    op.drop_table("lesson_resources")
+    op.drop_table("lessons")
+    op.drop_table("course_modules")
+    op.drop_table("courses")
+    op.drop_table("user_roles")
+    op.drop_table("roles")
+    op.drop_index(op.f("ix_users_email"), table_name="users")
+    op.drop_table("users")
+    op.drop_table("areas")
