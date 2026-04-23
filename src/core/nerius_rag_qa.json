@@ -1,0 +1,163 @@
+{
+  "metadata": {
+    "name": "nerius_platform_rag",
+    "description": "Base de conocimiento para un chatbox de preguntas y respuestas sobre el uso de la plataforma Nerius.",
+    "language": "es",
+    "version": "1.0",
+    "created_by": "GitHub Copilot",
+    "created_at": "2026-04-22"
+  },
+  "usage_instructions": "Esta base de datos está pensada para un modelo LLM que use búsqueda semántica entre preguntas y respuestas. Cada entrada es una unidad de conocimiento que puede ser devuelta como respuesta directa. Si la pregunta del usuario no coincide con ningún tema, el LLM debe indicar que no tiene suficiente información concreta.",
+  "entries": [
+    {
+      "id": "platform_overview",
+      "question": "¿Qué es la plataforma Nerius y para qué sirve?",
+      "answer": "Nerius es una plataforma de aprendizaje en línea con backend en FastAPI y frontend en Vite/React. Está diseñada para gestionar cursos, lecciones, quizzes, foro, gemas de conocimiento y certificaciones. La plataforma ofrece autenticación, progreso de cursos, asignación de cursos a usuarios y navegación de contenidos educativos.",
+      "tags": ["general", "plataforma", "overview"]
+    },
+    {
+      "id": "auth_login",
+      "question": "¿Cómo inicio sesión en la plataforma?",
+      "answer": "Para iniciar sesión se usa el endpoint POST /api/v1/auth/login con un JSON que incluye email y password. Si la autenticación es correcta, la plataforma devuelve un mensaje de login exitoso y una cookie de sesión HttpOnly llamada session_id para mantener la sesión activa.",
+      "tags": ["autenticacion", "login", "sesion"]
+    },
+    {
+      "id": "auth_logout",
+      "question": "¿Cómo cierro sesión?",
+      "answer": "Para cerrar sesión se solicita POST /api/v1/auth/logout. Esto invalida la sesión en el servidor y elimina la cookie session_id en el cliente.",
+      "tags": ["autenticacion", "logout", "sesion"]
+    },
+    {
+      "id": "auth_current_user",
+      "question": "¿Cómo obtengo los datos del usuario autenticado?",
+      "answer": "Usa GET /api/v1/auth/me con la cookie session_id activa. El endpoint retorna información del usuario actual como id, email, nombres, apellidos y estado.",
+      "tags": ["autenticacion", "usuario", "profile"]
+    },
+    {
+      "id": "courses_list",
+      "question": "¿Cómo veo los cursos disponibles en la plataforma?",
+      "answer": "Puedes consultar GET /api/v1/courses/ para obtener todos los cursos publicados. Este endpoint no requiere autenticación y devuelve datos como id, título, descripción, estado, minutos estimados y URL de portada.",
+      "tags": ["cursos", "catalogo", "listado"]
+    },
+    {
+      "id": "courses_enroll",
+      "question": "¿Cómo me inscribo en un curso?",
+      "answer": "Para inscribirte en un curso debes usar POST /api/v1/courses/{course_id}/enroll con tu sesión activa. El endpoint crea un enrollment para el usuario en el curso solicitado.",
+      "tags": ["cursos", "inscripcion", "enrollment"]
+    },
+    {
+      "id": "courses_pending",
+      "question": "¿Cómo veo mis cursos pendientes?",
+      "answer": "Consulta GET /api/v1/courses/user/pending con tu cookie session_id. Este endpoint muestra los cursos en los que estás inscrito y que todavía están activos, incluyendo porcentaje de progreso y datos del curso.",
+      "tags": ["cursos", "pendientes", "progreso"]
+    },
+    {
+      "id": "courses_completed",
+      "question": "¿Cómo veo los cursos que ya completé?",
+      "answer": "Usa GET /api/v1/courses/user/completed con sesión activa. Retorna los enrollments del usuario que se encuentran en estado completed y ordenados por fecha de finalización.",
+      "tags": ["cursos", "completados", "historial"]
+    },
+    {
+      "id": "courses_assigned_pending",
+      "question": "¿Qué son los cursos asignados pendientes?",
+      "answer": "Los cursos asignados pendientes son cursos que te fueron asignados por un administrador y que aún no has completado. Se obtienen con GET /api/v1/courses/user/assigned/pending. Aparecen incluso si no tienes un enrollment aún, siempre que el curso no esté marcado como completado.",
+      "tags": ["cursos", "asignados", "pendientes"]
+    },
+    {
+      "id": "quiz_access",
+      "question": "¿Cómo funciona el sistema de quizzes?",
+      "answer": "Los quizzes están ligados a lecciones dentro de cursos. Para consultar un quiz de una lección se usa GET /api/v1/courses/{course_id}/lessons/{lesson_id}/quiz. Solo está disponible si el usuario está inscrito en el curso. Los quizzes incluyen preguntas, opciones y reglas como puntaje mínimo, límite de intentos y tiempo.",
+      "tags": ["quizzes", "evaluaciones", "lecciones"]
+    },
+    {
+      "id": "quiz_start_attempt",
+      "question": "¿Cómo inicio un intento de quiz?",
+      "answer": "Para iniciar un intento se usa POST /api/v1/courses/{course_id}/lessons/{lesson_id}/quiz/attempts. El sistema verifica que el usuario tenga un enrollment activo o completado y que no haya excedido el número máximo de intentos.",
+      "tags": ["quizzes", "intento", "evaluacion"]
+    },
+    {
+      "id": "quiz_save_answers",
+      "question": "¿Cómo guardo las respuestas de un quiz?",
+      "answer": "Primero crea un intento con POST /api/v1/courses/{course_id}/lessons/{lesson_id}/quiz/attempts, luego envía respuestas con POST /api/v1/courses/{course_id}/quiz-attempts/{attempt_id}/responses. El intento debe estar en estado IN_PROGRESS.",
+      "tags": ["quizzes", "respuestas", "guardar"]
+    },
+    {
+      "id": "quiz_submit",
+      "question": "¿Cómo envío un quiz para calificar?",
+      "answer": "Envía la solicitud POST /api/v1/courses/{course_id}/quiz-attempts/{attempt_id}/submit con tu intento activo. El backend califica las respuestas, actualiza el estado del intento a COMPLETED o TIMED_OUT y devuelve el resultado con el puntaje.",
+      "tags": ["quizzes", "envio", "calificacion"]
+    },
+    {
+      "id": "gems_overview",
+      "question": "¿Qué son las gemas (gems) en la plataforma?",
+      "answer": "Las gemas son piezas de conocimiento destacadas que se pueden explorar y guardar. La plataforma ofrece categorías, etiquetas, recomendaciones y un buscador de gems. Sirven como recursos rápidos para aprender temas relevantes.",
+      "tags": ["gems", "conocimiento", "recursos"]
+    },
+    {
+      "id": "gems_list",
+      "question": "¿Cómo veo las gems disponibles?",
+      "answer": "Consulta GET /api/v1/gems para listar las gems publicadas. También hay endpoints especiales como GET /api/v1/gems/featured para gems destacadas y GET /api/v1/gems/recommended para recomendaciones personalizadas.",
+      "tags": ["gems", "listado", "destacadas"]
+    },
+    {
+      "id": "gems_search",
+      "question": "¿Cómo busco gemas por tema?",
+      "answer": "Usa GET /api/v1/gems/search?query=texto para buscar gems por título, descripción o etiquetas. El endpoint regresa resultados que coinciden con el término de búsqueda.",
+      "tags": ["gems", "busqueda", "search"]
+    },
+    {
+      "id": "gems_save",
+      "question": "¿Cómo guardo una gema en mi colección?",
+      "answer": "Para guardar una gema disponible se usa POST /api/v1/gems/{gem_id}/save con sesión activa. Esto añade la gema a la colección personal del usuario.",
+      "tags": ["gems", "coleccion", "guardar"]
+    },
+    {
+      "id": "forum_overview",
+      "question": "¿Qué funcionalidades tiene el foro de la plataforma?",
+      "answer": "El foro permite ver publicaciones públicas, buscar posts por texto, ver detalles de cada post y leer comentarios. También admite crear comentarios en posts existentes para participar en la conversación.",
+      "tags": ["foro", "comunidad", "posts"]
+    },
+    {
+      "id": "forum_posts",
+      "question": "¿Cómo veo las publicaciones del foro?",
+      "answer": "Usa GET /api/v1/forum para obtener las publicaciones más recientes y publicadas. Se puede usar limit y skip para paginar los resultados.",
+      "tags": ["foro", "posts", "listar"]
+    },
+    {
+      "id": "forum_search",
+      "question": "¿Cómo busco publicaciones en el foro?",
+      "answer": "Usa GET /api/v1/forum/search?query=texto para buscar posts por título o contenido. Esto retorna posts que coincidan con el término de búsqueda.",
+      "tags": ["foro", "search", "buscar"]
+    },
+    {
+      "id": "forum_post_detail",
+      "question": "¿Cómo veo el detalle de un post del foro?",
+      "answer": "Consulta GET /api/v1/forum/{post_id} para obtener el contenido completo del post, información del autor y la cantidad de comentarios.",
+      "tags": ["foro", "detalle", "post"]
+    },
+    {
+      "id": "forum_comments",
+      "question": "¿Cómo veo los comentarios de un post en el foro?",
+      "answer": "Usa GET /api/v1/forum/{post_id}/comments para obtener los comentarios top-level de ese post. Si quieres respuestas anidadas, debes consultar comentarios específicos adicionalmente.",
+      "tags": ["foro", "comentarios", "conversacion"]
+    },
+    {
+      "id": "forum_comment_create",
+      "question": "¿Cómo agrego un comentario a un post?",
+      "answer": "Envía POST /api/v1/forum/{post_id}/comments con cuerpo JSON que incluye texto y opcional parent_comment_id si es una respuesta. Debes estar autenticado para crear comentarios.",
+      "tags": ["foro", "comentarios", "crear"]
+    },
+    {
+      "id": "forum_comment_delete",
+      "question": "¿Cómo elimino un comentario en el foro?",
+      "answer": "Puedes borrar un comentario propio con DELETE /api/v1/forum/{post_id}/comments/{comment_id}. Solo el autor del comentario puede eliminarlo.",
+      "tags": ["foro", "comentarios", "eliminar"]
+    },
+    {
+      "id": "llm_usage",
+      "question": "¿Cómo debe usar un LLM esta base de datos para responder preguntas?",
+      "answer": "El LLM debe buscar la entrada más relevante según la pregunta del usuario, preferir respuestas cortas y directas, y devolver la respuesta completa del campo answer. Si no hay suficiente coincidencia, debe decir que no tiene información precisa en la base de datos.",
+      "tags": ["llm", "rag", "uso"]
+    }
+  ]
+}
