@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     mysql_root_password: str | None = None
     mysql_database: str | None = None
     session_expire_days: int = 30  # Session expiration in days
+    db_ssl_ca: str | None = None  # Path to CA certificate for MySQL SSL (e.g. /secrets/ca.pem)
+    # Comma-separated list of allowed CORS origins; override in production
+    cors_origins: str = "http://localhost:3000,http://localhost:5173,http://localhost:8080"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @model_validator(mode="after")
     def build_database_url(self) -> "Settings":

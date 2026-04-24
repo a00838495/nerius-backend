@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 366523499b0d
+Revision ID: 1fc71d78241b
 Revises: 
-Create Date: 2026-04-08 22:12:30.999298
+Create Date: 2026-04-20 17:39:34.817990
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '366523499b0d'
+revision: str = '1fc71d78241b'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -56,7 +56,7 @@ def upgrade() -> None:
     sa.UniqueConstraint('name')
     )
     op.create_table('roles',
-    sa.Column('name', sa.Enum('SUPER_ADMIN', 'CONTENT_ADMIN', 'LEARNER', name='role_name_enum', native_enum=False), nullable=False),
+    sa.Column('name', sa.Enum('SUPER_ADMIN', 'CONTENT_ADMIN', 'CONTENT_EDITOR', 'CONTENT_VIEWER', 'LEARNER', name='role_name_enum', native_enum=False), nullable=False),
     sa.Column('id', sa.CHAR(length=36), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
@@ -86,6 +86,7 @@ def upgrade() -> None:
     sa.Column('cover_url', sa.Text(), nullable=True),
     sa.Column('created_by_user_id', sa.CHAR(length=36), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
+    sa.Column('access_type', sa.Enum('free', 'restricted', name='course_access_type_enum', native_enum=False), server_default=sa.text("'free'"), nullable=False),
     sa.Column('id', sa.CHAR(length=36), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.ForeignKeyConstraint(['area_id'], ['areas.id'], onupdate='CASCADE', ondelete='SET NULL'),
@@ -117,6 +118,7 @@ def upgrade() -> None:
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('instructions', sa.Text(), nullable=False),
     sa.Column('icon_url', sa.Text(), nullable=True),
+    sa.Column('gemini_url', sa.Text(), nullable=True),
     sa.Column('conversation_starters', sa.JSON(), nullable=True),
     sa.Column('visibility', sa.Enum('PRIVATE', 'SHARED', 'PUBLIC', name='gem_visibility_enum', native_enum=False), server_default=sa.text("'public'"), nullable=False),
     sa.Column('is_featured', sa.Boolean(), server_default=sa.text('0'), nullable=False),
@@ -193,6 +195,18 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('course_id', 'badge_id', name='uq_course_badges_course_badge')
     )
+    op.create_table('course_certifications',
+    sa.Column('course_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('title', sa.String(length=255), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('cost', sa.DECIMAL(precision=10, scale=2), nullable=True),
+    sa.Column('validity_days', sa.Integer(), nullable=True),
+    sa.Column('id', sa.CHAR(length=36), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.ForeignKeyConstraint(['course_id'], ['courses.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('course_id')
+    )
     op.create_table('course_gems',
     sa.Column('course_id', sa.CHAR(length=36), nullable=False),
     sa.Column('gem_id', sa.CHAR(length=36), nullable=False),
@@ -257,6 +271,19 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['tag_id'], ['gem_tags.id'], onupdate='CASCADE', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('gem_id', 'tag_id')
     )
+    op.create_table('user_course_grants',
+    sa.Column('user_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('course_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('granted_by_user_id', sa.CHAR(length=36), nullable=True),
+    sa.Column('id', sa.CHAR(length=36), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.ForeignKeyConstraint(['course_id'], ['courses.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['granted_by_user_id'], ['users.id'], onupdate='CASCADE', ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'course_id', name='uq_user_course_grants_user_course')
+    )
+    op.create_index('idx_user_course_grants_user', 'user_course_grants', ['user_id'], unique=False)
     op.create_table('user_gem_collection',
     sa.Column('user_id', sa.CHAR(length=36), nullable=False),
     sa.Column('gem_id', sa.CHAR(length=36), nullable=False),
@@ -280,6 +307,30 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('module_id', 'sort_order', name='uq_lessons_module_sort')
     )
+    op.create_table('user_certifications',
+    sa.Column('user_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('course_certification_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('enrollment_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('status', sa.Enum('REQUESTED', 'APPROVED', 'ISSUED', 'REJECTED', name='certification_request_status_enum', native_enum=False), server_default=sa.text("'requested'"), nullable=False),
+    sa.Column('requested_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.Column('approved_at', sa.TIMESTAMP(), nullable=True),
+    sa.Column('issued_at', sa.TIMESTAMP(), nullable=True),
+    sa.Column('rejected_at', sa.TIMESTAMP(), nullable=True),
+    sa.Column('rejection_reason', sa.Text(), nullable=True),
+    sa.Column('expiration_date', sa.TIMESTAMP(), nullable=True),
+    sa.Column('certificate_code', sa.String(length=100), nullable=True),
+    sa.Column('certificate_url', sa.Text(), nullable=True),
+    sa.Column('id', sa.CHAR(length=36), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.ForeignKeyConstraint(['course_certification_id'], ['course_certifications.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['enrollment_id'], ['enrollments.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('certificate_code'),
+    sa.UniqueConstraint('user_id', 'course_certification_id', name='uq_user_certifications_user_cert')
+    )
+    op.create_index('idx_user_certifications_status', 'user_certifications', ['status'], unique=False)
+    op.create_index('idx_user_certifications_user', 'user_certifications', ['user_id'], unique=False)
     op.create_table('analytics_events',
     sa.Column('id', sa.BIGINT(), autoincrement=True, nullable=False),
     sa.Column('user_id', sa.CHAR(length=36), nullable=True),
@@ -339,11 +390,96 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['lesson_id'], ['lessons.id'], onupdate='CASCADE', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('quizzes',
+    sa.Column('lesson_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('title', sa.String(length=180), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('passing_score', sa.DECIMAL(precision=5, scale=2), server_default=sa.text('70.00'), nullable=False),
+    sa.Column('max_attempts', sa.Integer(), nullable=True),
+    sa.Column('time_limit_seconds', sa.Integer(), nullable=True),
+    sa.Column('is_required', sa.Boolean(), server_default=sa.text('1'), nullable=False),
+    sa.Column('updated_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
+    sa.Column('id', sa.CHAR(length=36), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.ForeignKeyConstraint(['lesson_id'], ['lessons.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('lesson_id')
+    )
+    op.create_table('quiz_attempts',
+    sa.Column('quiz_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('user_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('enrollment_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('attempt_number', sa.Integer(), nullable=False),
+    sa.Column('status', sa.Enum('IN_PROGRESS', 'COMPLETED', 'TIMED_OUT', name='quiz_attempt_status_enum', native_enum=False), server_default=sa.text("'in_progress'"), nullable=False),
+    sa.Column('score', sa.DECIMAL(precision=5, scale=2), nullable=True),
+    sa.Column('passed', sa.Boolean(), nullable=True),
+    sa.Column('started_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.Column('completed_at', sa.TIMESTAMP(), nullable=True),
+    sa.Column('time_spent_seconds', sa.Integer(), nullable=True),
+    sa.Column('id', sa.CHAR(length=36), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.ForeignKeyConstraint(['enrollment_id'], ['enrollments.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['quiz_id'], ['quizzes.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('quiz_id', 'user_id', 'attempt_number', name='uq_quiz_attempts_quiz_user_attempt')
+    )
+    op.create_index('idx_quiz_attempts_enrollment', 'quiz_attempts', ['enrollment_id'], unique=False)
+    op.create_index('idx_quiz_attempts_user_quiz', 'quiz_attempts', ['user_id', 'quiz_id'], unique=False)
+    op.create_table('quiz_questions',
+    sa.Column('quiz_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('question_type', sa.Enum('MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER', 'ORDERING', 'MATCHING', name='question_type_enum', native_enum=False), nullable=False),
+    sa.Column('question_text', sa.Text(), nullable=False),
+    sa.Column('explanation', sa.Text(), nullable=True),
+    sa.Column('points', sa.DECIMAL(precision=5, scale=2), server_default=sa.text('1.00'), nullable=False),
+    sa.Column('sort_order', sa.Integer(), nullable=False),
+    sa.Column('id', sa.CHAR(length=36), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.ForeignKeyConstraint(['quiz_id'], ['quizzes.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('quiz_id', 'sort_order', name='uq_quiz_questions_quiz_sort')
+    )
+    op.create_table('quiz_question_options',
+    sa.Column('question_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('option_text', sa.Text(), nullable=False),
+    sa.Column('is_correct', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+    sa.Column('sort_order', sa.Integer(), nullable=False),
+    sa.Column('match_target', sa.Text(), nullable=True),
+    sa.Column('id', sa.CHAR(length=36), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.ForeignKeyConstraint(['question_id'], ['quiz_questions.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('question_id', 'sort_order', name='uq_quiz_question_options_question_sort')
+    )
+    op.create_table('quiz_attempt_responses',
+    sa.Column('attempt_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('question_id', sa.CHAR(length=36), nullable=False),
+    sa.Column('selected_option_id', sa.CHAR(length=36), nullable=True),
+    sa.Column('text_response', sa.Text(), nullable=True),
+    sa.Column('ordering_response', sa.JSON(), nullable=True),
+    sa.Column('matching_response', sa.JSON(), nullable=True),
+    sa.Column('is_correct', sa.Boolean(), nullable=True),
+    sa.Column('points_earned', sa.DECIMAL(precision=5, scale=2), nullable=True),
+    sa.Column('id', sa.CHAR(length=36), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.ForeignKeyConstraint(['attempt_id'], ['quiz_attempts.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['question_id'], ['quiz_questions.id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['selected_option_id'], ['quiz_question_options.id'], onupdate='CASCADE', ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('attempt_id', 'question_id', name='uq_quiz_attempt_responses_attempt_question')
+    )
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_table('quiz_attempt_responses')
+    op.drop_table('quiz_question_options')
+    op.drop_table('quiz_questions')
+    op.drop_index('idx_quiz_attempts_user_quiz', table_name='quiz_attempts')
+    op.drop_index('idx_quiz_attempts_enrollment', table_name='quiz_attempts')
+    op.drop_table('quiz_attempts')
+    op.drop_table('quizzes')
     op.drop_table('lesson_resources')
     op.drop_table('lesson_progress')
     op.drop_table('lesson_gems')
@@ -353,14 +489,20 @@ def downgrade() -> None:
     op.drop_index('idx_analytics_events_course', table_name='analytics_events')
     op.drop_index('idx_analytics_events_area', table_name='analytics_events')
     op.drop_table('analytics_events')
+    op.drop_index('idx_user_certifications_user', table_name='user_certifications')
+    op.drop_index('idx_user_certifications_status', table_name='user_certifications')
+    op.drop_table('user_certifications')
     op.drop_table('lessons')
     op.drop_table('user_gem_collection')
+    op.drop_index('idx_user_course_grants_user', table_name='user_course_grants')
+    op.drop_table('user_course_grants')
     op.drop_table('gem_tag_links')
     op.drop_table('gem_area_links')
     op.drop_table('forum_comments')
     op.drop_table('enrollments')
     op.drop_table('course_modules')
     op.drop_table('course_gems')
+    op.drop_table('course_certifications')
     op.drop_table('course_badges')
     op.drop_index('idx_course_assignments_due_date', table_name='course_assignments')
     op.drop_index('idx_course_assignments_assigned_by', table_name='course_assignments')

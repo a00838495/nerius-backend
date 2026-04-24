@@ -9,6 +9,8 @@ from src.core.config import settings
 def _engine_options() -> dict:
     if settings.database_url.startswith("sqlite"):
         return {"connect_args": {"check_same_thread": False}}
+    if settings.db_ssl_ca:
+        return {"connect_args": {"ssl": {"ca": settings.db_ssl_ca}}}
     return {}
 
 
