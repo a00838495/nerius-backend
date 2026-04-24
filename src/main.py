@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from scalar_fastapi import get_scalar_api_reference
@@ -7,13 +9,17 @@ from src.core.config import settings
 from seed_data import seed_database
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    seed_database()
+    yield
+
+
 app = FastAPI(
     title=settings.app_name,
     debug=settings.app_debug,
+    lifespan=lifespan,
 )
-
-# Seed database on startup
-seed_database()
 
 # Add CORS middleware to allow frontend requests (localhost)
 app.add_middleware(
