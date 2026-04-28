@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     db_ssl_ca: str | None = None  # Path to CA certificate for MySQL SSL (e.g. /secrets/ca.pem)
     # Comma-separated list of allowed CORS origins; override in production
     cors_origins: str = "http://localhost:3000,http://localhost:5173,http://localhost:8080"
+    ai_api_key: str | None = None
 
     @property
     def cors_origins_list(self) -> list[str]:

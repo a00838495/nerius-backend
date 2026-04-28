@@ -33,6 +33,7 @@ class ForumPostSummaryRead(BaseModel):
     id: str
     title: str
     content: str
+    category: str | None = None
     multimedia_url: str | None
     author: UserBasicRead
     status: str
@@ -48,6 +49,7 @@ class ForumPostDetailRead(BaseModel):
     id: str
     title: str
     content: str
+    category: str | None = None
     multimedia_url: str | None
     author: UserBasicRead
     status: str
@@ -62,6 +64,15 @@ class ForumPostDetailRead(BaseModel):
 # ============================================================
 # Input schemas for creating/updating forum content
 # ============================================================
+
+class ForumPostCreate(BaseModel):
+    """Schema for creating a new forum post."""
+    title: str = Field(..., min_length=5, max_length=180)
+    content: str = Field(..., min_length=10, max_length=10000)
+    category: str | None = Field(default="General", max_length=80)
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ForumCommentCreate(BaseModel):
     """Schema for creating a new comment."""

@@ -1,4 +1,29 @@
+# Environment variables — NUNCA commitear
 .env
-.env.local
-.env.*.local
+
+# Virtual environment
+.venv/
 venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Database local
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Build
+dist/
+build/
+*.egg-info/

@@ -20,6 +20,7 @@ from src.schemas.forum import (
     ForumCommentRead,
     ForumCommentCreate,
     ForumCommentUpdate,
+    ForumPostCreate,
     UserBasicRead,
 )
 
@@ -62,52 +63,84 @@ def get_current_user(
     return None
 
 
+@router.post("", response_model=ForumPostSummaryRead, status_code=201)
+def create_forum_post(
+    post_data: ForumPostCreate,
+    current_user: User = Depends(get_current_user_required),
+    db: Session = Depends(get_db),
+):
+    """Create a new forum post. Published immediately. Requires authentication."""
+    new_post = ForumPost(
+        id=str(uuid.uuid4()),
+        author_user_id=current_user.id,
+        title=post_data.title.strip(),
+        content=post_data.content.strip(),
+        category=post_data.category,
+        status=PublicationStatus.PUBLISHED,
+        published_at=datetime.utcnow(),
+    )
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
+    db.refresh(new_post, ["author"])
+
+    return ForumPostSummaryRead(
+        id=new_post.id,
+        title=new_post.title,
+        content=new_post.content,
+        category=new_post.category,
+        multimedia_url=new_post.multimedia_url,
+        author=UserBasicRead(
+            id=new_post.author.id,
+            first_name=new_post.author.first_name,
+            last_name=new_post.author.last_name,
+            email=new_post.author.email,
+        ),
+        status=new_post.status.value,
+        created_at=new_post.created_at,
+        published_at=new_post.published_at,
+        comments_count=0,
+    )
+
+
 @router.get("", response_model=list[ForumPostSummaryRead])
 def get_forum_posts(
     db: Session = Depends(get_db),
     limit: int = 10,
     skip: int = 0,
+    category: str | None = Query(default=None, description="Filter by category"),
+    sort: str = Query(default="recent", description="Sort order: recent | popular"),
 ):
-    """
-    Get the latest forum posts (published only).
-    
-    - **limit**: Maximum number of posts to return (default: 10, max: 50)
-    - **skip**: Number of posts to skip for pagination (default: 0)
-    
-    Returns posts ordered by published_at (most recent first).
-    """
-    # Limit validation
+    """Get forum posts (published only). Supports category filter and sort."""
     if limit > 50:
         limit = 50
     if limit < 1:
         limit = 10
-    
-    # Query published posts with author information
-    posts = (
+
+    query = (
         db.query(ForumPost)
         .options(joinedload(ForumPost.author))
         .filter(ForumPost.status == PublicationStatus.PUBLISHED)
-        .order_by(ForumPost.published_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
     )
-    
-    # Build response with comment counts
+
+    if category:
+        query = query.filter(ForumPost.category == category)
+
+    posts = query.order_by(ForumPost.published_at.desc()).offset(skip).limit(limit).all()
+
     result = []
     for post in posts:
-        # Count comments for this post
         comments_count = (
             db.query(func.count(ForumComment.id))
             .filter(ForumComment.post_id == post.id)
             .scalar()
         )
-        
         result.append(
             ForumPostSummaryRead(
                 id=post.id,
                 title=post.title,
                 content=post.content,
+                category=post.category,
                 multimedia_url=post.multimedia_url,
                 author=UserBasicRead(
                     id=post.author.id,
@@ -121,7 +154,10 @@ def get_forum_posts(
                 comments_count=comments_count,
             )
         )
-    
+
+    if sort == "popular":
+        result.sort(key=lambda p: p.comments_count, reverse=True)
+
     return result
 
 
@@ -177,6 +213,7 @@ def search_forum_posts(
                 id=post.id,
                 title=post.title,
                 content=post.content,
+                category=post.category,
                 multimedia_url=post.multimedia_url,
                 author=UserBasicRead(
                     id=post.author.id,
@@ -190,7 +227,7 @@ def search_forum_posts(
                 comments_count=comments_count,
             )
         )
-    
+
     return result
 
 

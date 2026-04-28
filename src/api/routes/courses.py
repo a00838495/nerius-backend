@@ -1,8 +1,30 @@
 """Courses routes."""
 
+import unicodedata
 import uuid
 from datetime import datetime
 from decimal import Decimal
+
+from rapidfuzz import fuzz
+
+
+def _normalize(text: str) -> str:
+    return "".join(
+        c for c in unicodedata.normalize("NFD", text.lower())
+        if unicodedata.category(c) != "Mn"
+    )
+
+
+def _matches_search(query: str, course: "Course") -> bool:
+    q = _normalize(query)
+    fields = [course.title, course.description or ""]
+    for field in fields:
+        t = _normalize(field)
+        if q in t:
+            return True
+        if fuzz.partial_ratio(q, t) >= 65:
+            return True
+    return False
 
 from fastapi import APIRouter, Depends, HTTPException, Cookie, Query
 from sqlalchemy import func
@@ -152,25 +174,28 @@ def get_available_courses(
     current_user: User | None = Depends(get_optional_current_user),
     limit: int = Query(default=10, ge=1, le=50, description="Maximum number of courses to return"),
     skip: int = Query(default=0, ge=0, description="Number of courses to skip for pagination"),
+    search: str | None = Query(default=None, description="Fuzzy/phonetic search term"),
 ):
     """
-    Get all published courses with pagination.
+    Get all published courses with optional fuzzy search and pagination.
 
+    - **search**: Optional term — tolerates typos and missing accents (e.g. "matematicas" finds "Matemáticas")
     - **limit**: Maximum number of courses to return (default: 10, max: 50)
     - **skip**: Number of courses to skip for pagination (default: 0)
-
-    Returns courses ordered by creation date (most recent first).
-    If authenticated, includes enrollment status and progress.
     """
-    courses = (
+    query = (
         db.query(Course)
         .options(joinedload(Course.area), joinedload(Course.created_by_user))
         .filter(Course.status == PublicationStatus.PUBLISHED)
         .order_by(Course.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
     )
+
+    if search and search.strip():
+        all_courses = query.all()
+        courses = [c for c in all_courses if _matches_search(search.strip(), c)]
+        courses = courses[skip: skip + limit]
+    else:
+        courses = query.offset(skip).limit(limit).all()
 
     # Precompute which courses have certifications
     cert_course_ids = set(

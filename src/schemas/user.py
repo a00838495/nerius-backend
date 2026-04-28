@@ -42,6 +42,11 @@ class UserStatsRead(BaseModel):
     enrolled_courses: int = 0
 
 
+class UserUpdateRequest(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
