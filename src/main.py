@@ -6,6 +6,7 @@ from scalar_fastapi import get_scalar_api_reference
 
 from src.api.router import api_router
 from src.core.config import settings
+from src.core.metrics import RequestMetricsMiddleware
 from seed_data import seed_database
 
 
@@ -29,6 +30,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(RequestMetricsMiddleware)
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
