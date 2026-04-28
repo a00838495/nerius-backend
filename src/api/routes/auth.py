@@ -7,6 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from src.core.auth import authenticate_user, create_session, validate_session, invalidate_session
+from src.core.audit import AuditAction, log_action
 from src.db.session import get_db
 from src.schemas.user import LoginRequest, LoginResponse, UserRead, UserProfileRead, UserStatsRead
 
@@ -23,6 +24,13 @@ def login(
     """Login with email and password. Sets a session cookie."""
     user = authenticate_user(request.email, request.password, db)
     if not user:
+        log_action(
+            db,
+            AuditAction.AUTH_LOGIN_FAILED,
+            description=f"Intento de login fallido para {request.email}",
+            extra_data={"email": request.email},
+            request=http_request,
+        )
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password",
@@ -39,7 +47,15 @@ def login(
         user_agent=user_agent,
         ip_address=ip_address,
     )
-    
+
+    log_action(
+        db,
+        AuditAction.AUTH_LOGIN,
+        user_id=user.id,
+        description=f"Login exitoso de {user.email}",
+        request=http_request,
+    )
+
     response.set_cookie(
         key="session_id",
         value=session_id,
@@ -64,15 +80,29 @@ def login(
 @router.post("/logout")
 def logout(
     response: Response,
+    http_request: Request,
     session_id: str | None = Cookie(None),
     db: Session = Depends(get_db),
 ):
     """Logout and invalidate session."""
+    user_id_for_log: str | None = None
     if session_id:
+        sess = validate_session(session_id, db)
+        if sess:
+            user_id_for_log = sess.get("user_id")
         invalidate_session(session_id, db)
-    
+
     response.delete_cookie("session_id")
-    
+
+    if user_id_for_log:
+        log_action(
+            db,
+            AuditAction.AUTH_LOGOUT,
+            user_id=user_id_for_log,
+            description="Logout del usuario",
+            request=http_request,
+        )
+
     return {"message": "Logout successful"}
 
 
