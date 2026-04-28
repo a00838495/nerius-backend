@@ -8,10 +8,11 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
+from src.core.audit import AuditAction, log_action
 from src.core.permissions import (
     require_admin,
     require_course_reader,
@@ -121,6 +122,7 @@ def list_courses_admin(
 @router.post("/courses", response_model=CourseAdminRead, status_code=201)
 def create_course(
     body: CourseAdminCreate,
+    request: Request,
     current_user: User = Depends(require_course_publisher),
     db: Session = Depends(get_db),
 ):
@@ -155,6 +157,18 @@ def create_course(
     db.refresh(course)
     # Eager-load relations for response
     db.refresh(course, attribute_names=["area", "created_by_user"])
+
+    log_action(
+        db,
+        AuditAction.COURSE_CREATED,
+        user_id=current_user.id,
+        resource_type="course",
+        resource_id=course.id,
+        description=f"Curso creado: {course.title}",
+        extra_data={"status": course.status.value, "access_type": course.access_type.value},
+        request=request,
+    )
+
     return _course_to_admin_read(course, db)
 
 
@@ -174,6 +188,7 @@ def _validate_publish_requirements(course: Course, db: Session) -> None:
 def update_course(
     course_id: str,
     body: CourseAdminUpdate,
+    request: Request,
     current_user: User = Depends(require_course_editor),
     db: Session = Depends(get_db),
 ):
@@ -181,6 +196,9 @@ def update_course(
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
+
+    previous_status = course.status
+    publish_event: str | None = None
 
     # Validate before mutation
     if body.status is not None:
@@ -198,6 +216,9 @@ def update_course(
         # Gating: require content before publish
         if new_status == PublicationStatus.PUBLISHED and course.status != PublicationStatus.PUBLISHED:
             _validate_publish_requirements(course, db)
+            publish_event = AuditAction.COURSE_PUBLISHED
+        elif new_status == PublicationStatus.ARCHIVED and course.status != PublicationStatus.ARCHIVED:
+            publish_event = AuditAction.COURSE_ARCHIVED
         course.status = new_status
 
     if body.access_type is not None:
@@ -221,12 +242,39 @@ def update_course(
     db.commit()
     db.refresh(course)
     db.refresh(course, attribute_names=["area", "created_by_user"])
+
+    # Always log the update event; emit a more specific event for publish/archive
+    log_action(
+        db,
+        AuditAction.COURSE_UPDATED,
+        user_id=current_user.id,
+        resource_type="course",
+        resource_id=course.id,
+        description=f"Curso actualizado: {course.title}",
+        extra_data={
+            "previous_status": previous_status.value,
+            "new_status": course.status.value,
+        },
+        request=request,
+    )
+    if publish_event:
+        log_action(
+            db,
+            publish_event,
+            user_id=current_user.id,
+            resource_type="course",
+            resource_id=course.id,
+            description=f"Curso {publish_event.split('.')[-1]}: {course.title}",
+            request=request,
+        )
+
     return _course_to_admin_read(course, db)
 
 
 @router.delete("/courses/{course_id}", status_code=204)
 def delete_course(
     course_id: str,
+    request: Request,
     current_user: User = Depends(require_course_publisher),
     db: Session = Depends(get_db),
 ):
@@ -236,6 +284,16 @@ def delete_course(
         raise HTTPException(status_code=404, detail="Course not found")
     course.status = PublicationStatus.ARCHIVED
     db.commit()
+
+    log_action(
+        db,
+        AuditAction.COURSE_DELETED,
+        user_id=current_user.id,
+        resource_type="course",
+        resource_id=course.id,
+        description=f"Curso archivado (soft-delete): {course.title}",
+        request=request,
+    )
     return None
 
 
@@ -1265,6 +1323,7 @@ def list_users_for_role_mgmt(
 def set_user_admin_role(
     user_id: str,
     body: SetAdminRoleRequest,
+    request: Request,
     current_user: User = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
@@ -1302,6 +1361,12 @@ def set_user_admin_role(
             status_code=400,
             detail="No se puede modificar el rol de un super administrador",
         )
+
+    # Compute previous admin role for audit
+    previous_admin_role = next(
+        (rn for rn in existing_role_names if rn in ASSIGNABLE_ADMIN_ROLES),
+        None,
+    )
 
     # Remove any existing admin roles (except super_admin, handled above)
     for role_obj in existing_user_roles:
@@ -1346,6 +1411,26 @@ def set_user_admin_role(
 
     db.commit()
     db.refresh(user)
+
+    log_action(
+        db,
+        AuditAction.USER_ROLE_CHANGED,
+        user_id=current_user.id,
+        resource_type="user",
+        resource_id=user_id,
+        description=(
+            f"Rol cambiado para {user.email}: "
+            f"{previous_admin_role or 'ninguno'} → {body.role or 'ninguno'}"
+        ),
+        extra_data={
+            "target_user_id": user_id,
+            "target_user_email": user.email,
+            "previous_role": previous_admin_role,
+            "new_role": body.role,
+        },
+        request=request,
+    )
+
     return _user_to_role_read(user, db)
 
 
