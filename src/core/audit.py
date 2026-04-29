@@ -28,10 +28,14 @@ class AuditAction:
     AUTH_LOGOUT = "auth.logout"
 
     # User / role management
+    USER_CREATED = "user.created"
+    USER_UPDATED = "user.updated"
     USER_ROLE_CHANGED = "user.role_changed"
     USER_SUSPENDED = "user.suspended"
     USER_ACTIVATED = "user.activated"
+    USER_DEACTIVATED = "user.deactivated"
     USER_DELETED = "user.deleted"
+    USER_PASSWORD_RESET = "user.password_reset"
 
     # Course management
     COURSE_CREATED = "course.created"
@@ -39,6 +43,40 @@ class AuditAction:
     COURSE_PUBLISHED = "course.published"
     COURSE_ARCHIVED = "course.archived"
     COURSE_DELETED = "course.deleted"
+
+    # Course assignments
+    ASSIGNMENT_CREATED = "assignment.created"
+    ASSIGNMENT_DELETED = "assignment.deleted"
+    ASSIGNMENT_BULK_CREATED = "assignment.bulk_created"
+
+    # Enrollments
+    ENROLLMENT_UPDATED = "enrollment.updated"
+    ENROLLMENT_CANCELLED = "enrollment.cancelled"
+
+    # Areas
+    AREA_CREATED = "area.created"
+    AREA_UPDATED = "area.updated"
+    AREA_DELETED = "area.deleted"
+
+    # Forum moderation
+    FORUM_POST_HIDDEN = "forum.post_hidden"
+    FORUM_POST_PUBLISHED = "forum.post_published"
+    FORUM_POST_UPDATED = "forum.post_updated"
+    FORUM_POST_DELETED = "forum.post_deleted"
+    FORUM_COMMENT_DELETED = "forum.comment_deleted"
+
+    # Gems (global)
+    GEM_CREATED = "gem.created"
+    GEM_UPDATED = "gem.updated"
+    GEM_DELETED = "gem.deleted"
+    GEM_CATEGORY_CREATED = "gem_category.created"
+    GEM_CATEGORY_UPDATED = "gem_category.updated"
+    GEM_CATEGORY_DELETED = "gem_category.deleted"
+
+    # Badges (global)
+    BADGE_CREATED = "badge.created"
+    BADGE_UPDATED = "badge.updated"
+    BADGE_DELETED = "badge.deleted"
 
     # Session management
     SESSION_REVOKED = "session.revoked"
@@ -49,6 +87,7 @@ class AuditAction:
     CERT_APPROVED = "certification.approved"
     CERT_REJECTED = "certification.rejected"
     CERT_REVOKED = "certification.revoked"
+    CERT_ISSUED = "certification.issued"
 
 
 # All known actions — used by the /audit-logs/actions endpoint
