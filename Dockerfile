@@ -15,10 +15,18 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# curl is needed for HEALTHCHECK; ca-certificates for HTTPS to Aiven/etc.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /install /usr/local
 
 COPY . .
 
+# DB_SSL_CA is set for Aiven (GCP). On Dockploy with internal MySQL, override it
+# to empty in the platform's env vars so SQLAlchemy skips SSL.
 ENV DB_SSL_CA=/app/ca.pem
 
 RUN chmod +x start.sh
@@ -28,7 +36,10 @@ RUN adduser --disabled-password --gecos "" --no-create-home appuser \
 
 USER appuser
 
-# Cloud Run injects $PORT (default 8080)
+# Cloud Run injects $PORT; default 8080 also works on Dockploy.
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS "http://127.0.0.1:${PORT:-8080}/api/v1/health" || exit 1
 
 CMD ["./start.sh"]

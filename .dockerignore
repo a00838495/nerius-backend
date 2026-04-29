@@ -1,20 +1,57 @@
-.env
-.venv/
+# Python
 __pycache__/
 *.pyc
 *.pyo
-.git/
-.gitignore
-*.md
+*.pyd
+.Python
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 *.egg-info/
-dist/
-build/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Local DB / data
+app.db
+*.sqlite
+*.sqlite3
+
+# Env / secrets (keep ca.pem since the runtime image needs it)
+.env
+.env.*
+
+# Git / IDE / OS
+.git/
+.gitignore
+.vscode/
+.idea/
+*.swp
 .DS_Store
 Thumbs.db
+
+# Test / dev scripts not needed in the image
 test_*.sh
 verify_*.sh
 add_forum_data.py
 clear_data.py
 cleanup_sessions.py
+update_emails_to_whirpool.py
+
+# Docs
+*.md
+
+# Build artifacts
+dist/
+build/
+
+# Docker meta
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Cloud config (not needed inside the container)
+cloudbuild.yaml

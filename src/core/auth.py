@@ -1,5 +1,6 @@
 """Authentication utilities for password hashing and session management."""
 
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session as DBSession
 
 from src.db.models.learning_platform import User, Session
 from src.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 # Password hashing
@@ -98,11 +101,33 @@ def cleanup_expired_sessions(db: DBSession) -> int:
     return count
 
 
-def authenticate_user(email: str, password: str, db: DBSession) -> User | None:
-    """Authenticate a user with email and password."""
-    user = db.query(User).filter(User.email == email).first()
+def authenticate_user(email: str, password: str, db: DBSession) -> tuple[User | None, str]:
+    """Authenticate a user with email and password.
+
+    Returns (user, reason). On success: (user, "ok"). On failure user is None
+    and reason is one of: "user_not_found", "empty_password_hash",
+    "invalid_password", "verify_error:<exc>", "db_error:<exc>".
+    """
+    try:
+        user = db.query(User).filter(User.email == email).first()
+    except Exception as e:
+        logger.exception("DB error while looking up user %s", email)
+        return None, f"db_error:{type(e).__name__}:{e}"
+
     if not user:
-        return None
-    if not verify_password(password, user.password):
-        return None
-    return user
+        logger.info("authenticate_user: user not found for email=%s", email)
+        return None, "user_not_found"
+
+    if not user.password:
+        logger.warning("authenticate_user: user %s has empty password hash", email)
+        return None, "empty_password_hash"
+
+    try:
+        if not verify_password(password, user.password):
+            logger.info("authenticate_user: invalid password for email=%s", email)
+            return None, "invalid_password"
+    except Exception as e:
+        logger.exception("authenticate_user: verify_password raised for email=%s", email)
+        return None, f"verify_error:{type(e).__name__}:{e}"
+
+    return user, "ok"

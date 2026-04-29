@@ -1,7 +1,11 @@
 """Authentication routes."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Response, Cookie, Request
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -42,18 +46,25 @@ def login(
             detail=f"Only users with @{ALLOWED_EMAIL_DOMAIN} email addresses are allowed to log in",
         )
 
-    user = authenticate_user(request.email, request.password, db)
+    user, auth_reason = authenticate_user(email_normalized, request.password, db)
     if not user:
+        logger.warning(
+            "Login failed email=%s reason=%s ip=%s ua=%s",
+            email_normalized,
+            auth_reason,
+            http_request.client.host if http_request.client else None,
+            http_request.headers.get("user-agent"),
+        )
         log_action(
             db,
             AuditAction.AUTH_LOGIN_FAILED,
-            description=f"Intento de login fallido para {request.email}",
-            extra_data={"email": request.email},
+            description=f"Intento de login fallido para {request.email} (reason={auth_reason})",
+            extra_data={"email": request.email, "reason": auth_reason},
             request=http_request,
         )
         raise HTTPException(
             status_code=401,
-            detail="Invalid email or password",
+            detail=f"Invalid email or password (reason={auth_reason})",
         )
 
     # Get user agent and IP from request
