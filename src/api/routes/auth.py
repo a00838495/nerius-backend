@@ -13,6 +13,8 @@ from src.schemas.user import LoginRequest, LoginResponse, UserRead, UserProfileR
 
 router = APIRouter(tags=["auth"])
 
+ALLOWED_EMAIL_DOMAIN = "whirpool.com"
+
 
 @router.post("/login", response_model=LoginResponse)
 def login(
@@ -21,7 +23,25 @@ def login(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    """Login with email and password. Sets a session cookie."""
+    """Login with email and password. Sets a session cookie.
+
+    Solo se permite el login a usuarios cuyo email pertenezca al dominio
+    corporativo `@whirpool.com` (SSO empresarial).
+    """
+    email_normalized = request.email.strip().lower()
+    if not email_normalized.endswith(f"@{ALLOWED_EMAIL_DOMAIN}"):
+        log_action(
+            db,
+            AuditAction.AUTH_LOGIN_FAILED,
+            description=f"Intento de login con dominio no autorizado: {request.email}",
+            extra_data={"email": request.email, "reason": "invalid_domain"},
+            request=http_request,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=f"Only users with @{ALLOWED_EMAIL_DOMAIN} email addresses are allowed to log in",
+        )
+
     user = authenticate_user(request.email, request.password, db)
     if not user:
         log_action(

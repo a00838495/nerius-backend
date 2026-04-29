@@ -115,6 +115,10 @@ class UserAdminCreate(BaseModel):
     password: str = Field(..., min_length=6, max_length=100)
     gender: str | None = Field(None, max_length=30)
     area_id: str | None = None
+    role: str | None = Field(
+        None,
+        description="Optional admin role to assign on creation: 'content_admin' | 'content_editor' | 'content_viewer'. If omitted, only 'learner' is assigned.",
+    )
 
 
 class UserAdminUpdate(BaseModel):

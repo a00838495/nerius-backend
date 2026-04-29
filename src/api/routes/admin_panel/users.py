@@ -237,6 +237,13 @@ def get_user_detail(
     )
 
 
+_ASSIGNABLE_ADMIN_ROLES_ON_CREATE = {
+    RoleName.CONTENT_ADMIN.value,
+    RoleName.CONTENT_EDITOR.value,
+    RoleName.CONTENT_VIEWER.value,
+}
+
+
 @router.post("", response_model=UserAdminRead, status_code=201)
 def create_user(
     body: UserAdminCreate,
@@ -244,7 +251,12 @@ def create_user(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """Create a new learner user. Always assigned the 'learner' role."""
+    """Create a new user.
+
+    Always assigns the 'learner' role. Optionally, an admin role can be
+    granted in the same operation via `body.role` (one of `content_admin`,
+    `content_editor`, `content_viewer`). `super_admin` cannot be assigned here.
+    """
     existing = db.query(User).filter(User.email == body.email).first()
     if existing:
         raise HTTPException(status_code=409, detail="Ya existe un usuario con ese email")
@@ -253,6 +265,20 @@ def create_user(
         area = db.query(Area).filter(Area.id == body.area_id).first()
         if not area:
             raise HTTPException(status_code=404, detail="Área no encontrada")
+
+    admin_role_obj: Role | None = None
+    if body.role:
+        if body.role not in _ASSIGNABLE_ADMIN_ROLES_ON_CREATE:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Rol no válido. Use 'content_admin', 'content_editor' o "
+                    "'content_viewer'."
+                ),
+            )
+        admin_role_obj = db.query(Role).filter(Role.name == body.role).first()
+        if not admin_role_obj:
+            raise HTTPException(status_code=500, detail="Rol no inicializado en BD")
 
     user = User(
         id=str(uuid.uuid4()),
@@ -267,12 +293,18 @@ def create_user(
     db.add(user)
     db.flush()
 
-    # Assign learner role
     learner_role = db.query(Role).filter(Role.name == RoleName.LEARNER).first()
     if learner_role:
         db.add(UserRole(
             user_id=user.id,
             role_id=learner_role.id,
+            assigned_by_user_id=current_user.id,
+        ))
+
+    if admin_role_obj:
+        db.add(UserRole(
+            user_id=user.id,
+            role_id=admin_role_obj.id,
             assigned_by_user_id=current_user.id,
         ))
 
@@ -285,8 +317,13 @@ def create_user(
         user_id=current_user.id,
         resource_type="user",
         resource_id=user.id,
-        description=f"Usuario creado: {user.email}",
-        extra_data={"email": user.email, "area_id": user.area_id},
+        description=f"Usuario creado: {user.email}"
+        + (f" con rol {body.role}" if body.role else ""),
+        extra_data={
+            "email": user.email,
+            "area_id": user.area_id,
+            "role": body.role,
+        },
         request=request,
     )
 
