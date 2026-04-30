@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     # Comma-separated list of allowed CORS origins; override in production
     cors_origins: str = "http://localhost:3000,http://localhost:5173,http://localhost:8080"
     ai_api_key: str | None = None
+    emailjs_service_id: str | None = None
+    emailjs_template_id: str | None = None
+    emailjs_public_key: str | None = None
+    emailjs_private_key: str | None = None
 
     @property
     def cors_origins_list(self) -> list[str]:

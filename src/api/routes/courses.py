@@ -31,6 +31,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from src.core.auth import validate_session
+from src.core.email import send_assignment_email
 from src.db.session import get_db
 from src.db.models.learning_platform import (
     Area,
@@ -621,6 +622,16 @@ def assign_course_to_user(
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
+
+    send_assignment_email(
+        employee_name=f"{assigned_user.first_name} {assigned_user.last_name}".strip(),
+        employee_email=assigned_user.email,
+        course_title=course.title,
+        course_description=course.description,
+        estimated_minutes=course.estimated_minutes,
+        due_date=assignment.due_date,
+        assigned_by=f"{current_user.first_name} {current_user.last_name}".strip(),
+    )
 
     return CourseAssignmentRead(
         id=assignment.id,

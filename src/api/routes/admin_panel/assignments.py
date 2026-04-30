@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -161,7 +161,7 @@ def bulk_assign(
     if not course:
         raise HTTPException(status_code=404, detail="Curso no encontrado")
 
-    if body.due_date <= datetime.utcnow():
+    if body.due_date <= datetime.now(timezone.utc):
         raise HTTPException(
             status_code=400,
             detail="La fecha límite debe ser futura",
