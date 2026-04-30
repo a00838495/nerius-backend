@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     mysql_database: str | None = None
     session_expire_days: int = 30  # Session expiration in days
     db_ssl_ca: str | None = None  # Path to CA certificate for MySQL SSL (e.g. /secrets/ca.pem)
+    # Cloud SQL via Unix socket on Cloud Run: set INSTANCE_CONNECTION_NAME to
+    # "PROJECT:REGION:INSTANCE" and Cloud Run will mount the proxy at
+    # /cloudsql/<INSTANCE_CONNECTION_NAME>. cloud_sql_socket_dir defaults to
+    # /cloudsql but can be overridden for local Cloud SQL Auth Proxy testing.
+    instance_connection_name: str | None = None
+    cloud_sql_socket_dir: str = "/cloudsql"
     # Comma-separated list of allowed CORS origins; override in production
     cors_origins: str = "http://localhost:3000,http://localhost:5173,http://localhost:8080"
     ai_api_key: str | None = None
@@ -31,9 +37,30 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
+    @property
+    def is_cloud_sql_socket(self) -> bool:
+        return bool(self.instance_connection_name)
+
+    @property
+    def cloud_sql_socket_path(self) -> str | None:
+        if not self.instance_connection_name:
+            return None
+        return f"{self.cloud_sql_socket_dir.rstrip('/')}/{self.instance_connection_name}"
+
     @model_validator(mode="after")
     def build_database_url(self) -> "Settings":
         if self.database_url:
+            return self
+
+        # Cloud SQL via Unix socket (Cloud Run): no host/port in the URL.
+        # SQLAlchemy passes unix_socket through PyMySQL via query string.
+        if self.instance_connection_name and self.mysql_root_password and self.mysql_database:
+            password = quote_plus(self.mysql_root_password)
+            socket_path = quote_plus(self.cloud_sql_socket_path or "")
+            self.database_url = (
+                f"mysql+pymysql://{self.mysql_user}:{password}@/"
+                f"{self.mysql_database}?unix_socket={socket_path}"
+            )
             return self
 
         if self.mysql_root_password and self.mysql_database:

@@ -13,9 +13,30 @@ def clear_database():
         # Disable foreign key checks temporarily
         db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
         
-        # Clear tables in reverse order
+        # Children → parents order (FK checks are disabled above, so order is
+        # only a safety net). Covers gems, quizzes, certifications, audit logs
+        # and sessions added after the original seed.
         tables = [
             "analytics_events",
+            "request_metrics",
+            "audit_logs",
+            "sessions",
+            "quiz_attempt_responses",
+            "quiz_attempts",
+            "quiz_question_options",
+            "quiz_questions",
+            "quizzes",
+            "user_certifications",
+            "course_certifications",
+            "user_course_grants",
+            "user_gem_collection",
+            "lesson_gems",
+            "course_gems",
+            "gem_tag_links",
+            "gem_area_links",
+            "gem_tags",
+            "gems",
+            "gem_categories",
             "user_badges",
             "course_badges",
             "lesson_progress",

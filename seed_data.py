@@ -112,7 +112,7 @@ def seed_database():
         user_super_admin = User(
             id=generate_uuid(),
             area_id=area_tech.id,
-            email="superadmin@whirpool.com",
+            email="superadmin@whirlpool.com",
             first_name="Super",
             last_name="Admin",
             password=hash_password("password123"),
@@ -124,7 +124,7 @@ def seed_database():
         user_admin = User(
             id=generate_uuid(),
             area_id=area_business.id,
-            email="admin@whirpool.com",
+            email="admin@whirlpool.com",
             first_name="Content",
             last_name="Admin",
             password=hash_password("password123"),
@@ -136,7 +136,7 @@ def seed_database():
         user_editor = User(
             id=generate_uuid(),
             area_id=area_business.id,
-            email="editor@whirpool.com",
+            email="editor@whirlpool.com",
             first_name="Elena",
             last_name="Editor",
             password=hash_password("password123"),
@@ -148,7 +148,7 @@ def seed_database():
         user_viewer = User(
             id=generate_uuid(),
             area_id=area_tech.id,
-            email="viewer@whirpool.com",
+            email="viewer@whirlpool.com",
             first_name="Víctor",
             last_name="Viewer",
             password=hash_password("password123"),
@@ -160,7 +160,7 @@ def seed_database():
         user_learner = User(
             id=generate_uuid(),
             area_id=area_tech.id,
-            email="user@whirpool.com",
+            email="user@whirlpool.com",
             first_name="Juan",
             last_name="Perez",
             password=hash_password("password123"),
@@ -172,7 +172,7 @@ def seed_database():
         user_learner_2 = User(
             id=generate_uuid(),
             area_id=area_tech.id,
-            email="diego.herrera@whirpool.com",
+            email="diego.herrera@whirlpool.com",
             first_name="Diego",
             last_name="Herrera",
             password=hash_password("password123"),
@@ -184,7 +184,7 @@ def seed_database():
         user_learner_3 = User(
             id=generate_uuid(),
             area_id=area_business.id,
-            email="maria.gomez@whirpool.com",
+            email="maria.gomez@whirlpool.com",
             first_name="Maria",
             last_name="Gomez",
             password=hash_password("password123"),
@@ -196,7 +196,7 @@ def seed_database():
         user_learner_4 = User(
             id=generate_uuid(),
             area_id=area_tech.id,
-            email="luis.torres@whirpool.com",
+            email="luis.torres@whirlpool.com",
             first_name="Luis",
             last_name="Torres",
             password=hash_password("password123"),
@@ -208,7 +208,7 @@ def seed_database():
         user_learner_5 = User(
             id=generate_uuid(),
             area_id=area_business.id,
-            email="sofia.ramirez@whirpool.com",
+            email="sofia.ramirez@whirlpool.com",
             first_name="Sofia",
             last_name="Ramirez",
             password=hash_password("password123"),

@@ -1,30 +1,37 @@
-"""Update existing user emails from @example.com to @whirpool.com.
+"""Update existing user emails to @whirlpool.com.
 
-Run once to migrate seed data after introducing the @whirpool.com SSO rule.
-Preserves all foreign-key relationships — only updates the email column.
+Originally migrated @example.com → @whirpool.com; now also corrects the
+typo'd @whirpool.com → @whirlpool.com so the SSO domain matches the
+corporate brand. Preserves all foreign-key relationships — only updates
+the email column.
 """
-
-from sqlalchemy import update
 
 from src.db.session import SessionLocal
 from src.db.models.learning_platform import User
 
 
-OLD_DOMAIN = "@example.com"
-NEW_DOMAIN = "@whirpool.com"
+OLD_DOMAINS = ["@example.com", "@whirpool.com"]
+NEW_DOMAIN = "@whirlpool.com"
 
 
 def main() -> None:
     db = SessionLocal()
     try:
-        users = db.query(User).filter(User.email.like(f"%{OLD_DOMAIN}")).all()
+        users: list[User] = []
+        for old in OLD_DOMAINS:
+            users.extend(db.query(User).filter(User.email.like(f"%{old}")).all())
+
         if not users:
-            print(f"No users with {OLD_DOMAIN} found. Nothing to update.")
+            print(f"No users with {OLD_DOMAINS} found. Nothing to update.")
             return
 
         print(f"Found {len(users)} users to migrate:")
         for u in users:
-            new_email = u.email.replace(OLD_DOMAIN, NEW_DOMAIN)
+            new_email = u.email
+            for old in OLD_DOMAINS:
+                if new_email.endswith(old):
+                    new_email = new_email[: -len(old)] + NEW_DOMAIN
+                    break
             print(f"  {u.email}  ->  {new_email}")
             u.email = new_email
 

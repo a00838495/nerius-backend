@@ -25,9 +25,9 @@ COPY --from=builder /install /usr/local
 
 COPY . .
 
-# DB_SSL_CA is set for Aiven (GCP). On Dockploy with internal MySQL, override it
-# to empty in the platform's env vars so SQLAlchemy skips SSL.
-ENV DB_SSL_CA=/app/ca.pem
+# DB_SSL_CA defaults to empty: Cloud SQL via Unix socket handles TLS itself.
+# For Aiven/external MySQL, set DB_SSL_CA=/app/ca.pem at the platform level.
+ENV DB_SSL_CA=""
 
 RUN chmod +x start.sh
 

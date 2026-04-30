@@ -17,7 +17,7 @@ from src.schemas.user import LoginRequest, LoginResponse, UserRead, UserProfileR
 
 router = APIRouter(tags=["auth"])
 
-ALLOWED_EMAIL_DOMAIN = "whirpool.com"
+ALLOWED_EMAIL_DOMAIN = "whirlpool.com"
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -30,7 +30,7 @@ def login(
     """Login with email and password. Sets a session cookie.
 
     Solo se permite el login a usuarios cuyo email pertenezca al dominio
-    corporativo `@whirpool.com` (SSO empresarial).
+    corporativo `@whirlpool.com` (SSO empresarial).
     """
     email_normalized = request.email.strip().lower()
     if not email_normalized.endswith(f"@{ALLOWED_EMAIL_DOMAIN}"):
