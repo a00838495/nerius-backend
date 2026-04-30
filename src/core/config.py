@@ -49,11 +49,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def build_database_url(self) -> "Settings":
-        if self.database_url:
-            return self
-
-        # Cloud SQL via Unix socket (Cloud Run): no host/port in the URL.
-        # SQLAlchemy passes unix_socket through PyMySQL via query string.
+        # Cloud SQL via Unix socket (Cloud Run): if INSTANCE_CONNECTION_NAME
+        # is set, it ALWAYS wins, even over a manually provided DATABASE_URL.
+        # This prevents stale TCP DSNs from leaking into prod and ensures the
+        # /cloudsql/<INSTANCE> socket mounted by Cloud Run is what we use.
         if self.instance_connection_name and self.mysql_root_password and self.mysql_database:
             password = quote_plus(self.mysql_root_password)
             socket_path = quote_plus(self.cloud_sql_socket_path or "")
@@ -61,6 +60,9 @@ class Settings(BaseSettings):
                 f"mysql+pymysql://{self.mysql_user}:{password}@/"
                 f"{self.mysql_database}?unix_socket={socket_path}"
             )
+            return self
+
+        if self.database_url:
             return self
 
         if self.mysql_root_password and self.mysql_database:
